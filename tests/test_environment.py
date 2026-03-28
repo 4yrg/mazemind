@@ -14,8 +14,7 @@ MAZE_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'mazes', 'class
 
 @pytest.fixture
 def env():
-    files = list_maze_files(MAZE_DIR)
-    maze = parse_maze_file(files[0])
+    maze = parse_maze_file(os.path.join(MAZE_DIR, "50.txt"))
     return MicromouseEnv(maze)
 
 

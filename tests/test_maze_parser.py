@@ -14,9 +14,9 @@ MAZE_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'mazes', 'class
 
 @pytest.fixture
 def maze():
-    files = list_maze_files(MAZE_DIR)
-    assert len(files) > 0, "No maze files found"
-    return parse_maze_file(files[0])
+    maze_path = os.path.join(MAZE_DIR, "50.txt")
+    assert os.path.exists(maze_path), f"Maze file not found: {maze_path}"
+    return parse_maze_file(maze_path)
 
 
 class TestMazeParser:
