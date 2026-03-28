@@ -21,6 +21,7 @@ env/
 
 # Jupyter
 .ipynb_checkpoints/
+*_executed.ipynb
 
 # Data - maze files bundled in repo
 # OS
