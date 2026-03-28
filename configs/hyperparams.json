@@ -1,0 +1,14 @@
+{
+  "learning_rate": 0.1,
+  "discount_factor": 0.99,
+  "epsilon_start": 1.0,
+  "epsilon_min": 0.01,
+  "epsilon_decay": 0.995,
+  "n_planning_steps": 10,
+  "n_episodes": 500,
+  "max_steps_per_episode": 1000,
+  "n_seeds": 5,
+  "reward_step": -1,
+  "reward_goal": 100,
+  "reward_wall": -1
+}
