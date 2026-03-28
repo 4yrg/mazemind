@@ -1,4 +1,4 @@
-"""Matplotlib-based maze rendering with agent path visualization."""
+"""Matplotlib-based maze rendering using vertex-edge system."""
 
 from __future__ import annotations
 from typing import Optional
@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.collections import LineCollection
 
 from mazemind.envs.maze_parser import MazeData, ACTION_DELTAS
 
@@ -18,119 +19,67 @@ WALL_COLOR = "#2c3e50"
 VISITED_CMAP = "YlOrRd"
 
 
-def _maze_to_ascii(maze: MazeData) -> list[str]:
+def _cell_vertex(r, c, n):
+    """Map maze cell (r,c) to vertex grid positions.
+
+    Vertex grid: (2n+1) rows x (2n+1) cols.
+    Vertex row 0 = top of maze (north), vertex row 2n = bottom (south).
+    Maze row 0 = south, maze row n-1 = north.
+    """
+    vr_top = 2 * (n - 1 - r)
+    vr_bot = vr_top + 2
+    vc_left = 2 * c
+    vc_right = vc_left + 2
+    return vr_top, vr_bot, vc_left, vc_right
+
+
+def _draw_walls(ax: Axes, maze: MazeData, U: float):
     n = maze.size
-    lines = []
-    for row in range(n - 1, -1, -1):
-        top = ""
-        mid = ""
-        for col in range(n):
-            top += "o"
-            if maze.walls[row][col]["N"]:
-                top += "---"
-            else:
-                top += "   "
-            if maze.walls[row][col]["W"]:
-                mid += "| . "
-            else:
-                mid += "  . "
-            mid += " "
-        top += "o"
-        mid += "|"
-        lines.append(top)
-        lines.append(mid)
-    bottom = "o"
-    for col in range(n):
-        if maze.walls[0][col]["S"]:
-            bottom += "---o"
-        else:
-            bottom += "   o"
-    lines.append(bottom)
-    return lines
-
-
-def _render_ascii(ax: Axes, maze: MazeData, U: float = 40.0):
-    lines = _maze_to_ascii(maze)
-    n = maze.size
-    num_lines = len(lines)
-    lw = 5
-
     h_segs = []
-    for y, line in enumerate(lines):
-        if y % 2 == 0:
-            for x in range(len(line)):
-                if line[x:x + 3] == "---":
-                    vx1 = x * U / 4
-                    vx2 = (x + 3) * U / 4
-                    vy = (num_lines - 1 - y) * U / 4
-                    h_segs.append([(vx1, vy), (vx2, vy)])
-
     v_segs = []
-    for y, line in enumerate(lines):
-        if y % 2 == 1:
-            for x, ch in enumerate(line):
-                if ch == "|":
-                    vx = x * U / 4
-                    vy1 = (num_lines - 1 - y) * U / 4
-                    vy2 = (num_lines - y) * U / 4
-                    v_segs.append([(vx, vy1), (vx, vy2)])
 
-    from matplotlib.collections import LineCollection
+    for r in range(n):
+        for c in range(n):
+            vr_top, vr_bot, vc_left, vc_right = _cell_vertex(r, c, n)
+
+            if maze.walls[r][c]["N"]:
+                h_segs.append([(vc_left * U, vr_top * U),
+                               (vc_right * U, vr_top * U)])
+
+            if maze.walls[r][c]["S"]:
+                h_segs.append([(vc_left * U, vr_bot * U),
+                               (vc_right * U, vr_bot * U)])
+
+            if maze.walls[r][c]["W"]:
+                v_segs.append([(vc_left * U, vr_top * U),
+                               (vc_left * U, vr_bot * U)])
+
+            if maze.walls[r][c]["E"]:
+                v_segs.append([(vc_right * U, vr_top * U),
+                               (vc_right * U, vr_bot * U)])
+
+    lw = max(2, U * 0.12)
 
     if h_segs:
-        lc_h = LineCollection(h_segs, colors=WALL_COLOR, linewidths=lw,
-                              capstyle="butt", zorder=1)
-        ax.add_collection(lc_h)
+        lc = LineCollection(h_segs, colors=WALL_COLOR, linewidths=lw,
+                            capstyle="butt", zorder=1)
+        ax.add_collection(lc)
 
     if v_segs:
-        lc_v = LineCollection(v_segs, colors=WALL_COLOR, linewidths=lw,
-                              capstyle="butt", zorder=1)
-        ax.add_collection(lc_v)
+        lc = LineCollection(v_segs, colors=WALL_COLOR, linewidths=lw,
+                            capstyle="butt", zorder=1)
+        ax.add_collection(lc)
 
-    for y, line in enumerate(lines):
-        for x, ch in enumerate(line):
-            if ch == "o":
-                vx = x * U / 4
-                vy = (num_lines - 1 - y) * U / 4
-                ax.plot(vx, vy, "s", color=WALL_COLOR,
-                        markersize=lw * 1.1, zorder=2)
-
-    for gr, gc in maze.goals:
-        text_row = 2 * (n - 1 - gr) + 1
-        text_col = 4 * gc + 2
-        cx = text_col * U / 4
-        cy = (num_lines - 1 - text_row + 0.5) * U / 4
-        rect = plt.Rectangle(
-            (cx - U / 8, cy - U / 8), U / 4, U / 4,
-            facecolor=GOAL_COLOR, alpha=0.7, edgecolor="none", zorder=3,
-        )
-        ax.add_patch(rect)
-        ax.text(cx, cy, "G", ha="center", va="center",
-                fontsize=max(6, int(U / 8)), fontweight="bold",
-                color="white", zorder=4)
-
-    sr, sc = maze.start
-    text_row = 2 * (n - 1 - sr) + 1
-    text_col = 4 * sc + 2
-    cx = text_col * U / 4
-    cy = (num_lines - 1 - text_row + 0.5) * U / 4
-    rect = plt.Rectangle(
-        (cx - U / 8, cy - U / 8), U / 4, U / 4,
-        facecolor=START_COLOR, alpha=0.7, edgecolor="none", zorder=3,
-    )
-    ax.add_patch(rect)
-    ax.text(cx, cy, "S", ha="center", va="center",
-            fontsize=max(6, int(U / 8)), fontweight="bold",
-            color="white", zorder=4)
-
-    return U, num_lines
+    for vr in range(2 * n + 1):
+        for vc in range(2 * n + 1):
+            ax.plot(vc * U, vr * U, "s", color=WALL_COLOR,
+                    markersize=lw * 0.9, zorder=2)
 
 
-def _cell_to_xy(r, c, n, num_lines, U):
-    text_row = 2 * (n - 1 - r) + 1
-    text_col = 4 * c + 2
-    x = text_col * U / 4
-    y = (num_lines - 1 - text_row + 0.5) * U / 4
+def _cell_center(r, c, n, U):
+    vr_top, _, vc_left, _ = _cell_vertex(r, c, n)
+    x = (vc_left + 1) * U
+    y = (vr_top + 1) * U
     return x, y
 
 
@@ -151,10 +100,9 @@ def render_maze(
 
     n = maze.size
     U = 40.0
-    num_lines = 2 * n + 1
 
     if show_walls:
-        _render_ascii(ax, maze, U)
+        _draw_walls(ax, maze, U)
 
     if visit_counts is not None:
         vmax = max(visit_counts.max(), 1)
@@ -163,22 +111,44 @@ def render_maze(
                 if visit_counts[r][c] > 0:
                     intensity = visit_counts[r][c] / vmax
                     color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
-                    cx, cy = _cell_to_xy(r, c, n, num_lines, U)
+                    cx, cy = _cell_center(r, c, n, U)
                     rect = plt.Rectangle(
-                        (cx - U / 8, cy - U / 8), U / 4, U / 4,
-                        facecolor=color, alpha=0.5, zorder=2,
+                        (cx - U * 0.4, cy - U * 0.4), U * 0.8, U * 0.8,
+                        facecolor=color, alpha=0.5, zorder=3,
                     )
                     ax.add_patch(rect)
 
+    for gr, gc in maze.goals:
+        cx, cy = _cell_center(gr, gc, n, U)
+        rect = plt.Rectangle(
+            (cx - U * 0.35, cy - U * 0.35), U * 0.7, U * 0.7,
+            facecolor=GOAL_COLOR, alpha=0.7, edgecolor="none", zorder=4,
+        )
+        ax.add_patch(rect)
+        ax.text(cx, cy, "G", ha="center", va="center",
+                fontsize=max(6, int(U / 6)), fontweight="bold",
+                color="white", zorder=5)
+
+    sr, sc = maze.start
+    cx, cy = _cell_center(sr, sc, n, U)
+    rect = plt.Rectangle(
+        (cx - U * 0.35, cy - U * 0.35), U * 0.7, U * 0.7,
+        facecolor=START_COLOR, alpha=0.7, edgecolor="none", zorder=4,
+    )
+    ax.add_patch(rect)
+    ax.text(cx, cy, "S", ha="center", va="center",
+            fontsize=max(6, int(U / 6)), fontweight="bold",
+            color="white", zorder=5)
+
     if path and len(path) > 1:
-        px = [_cell_to_xy(r, c, n, num_lines, U)[0] for r, c in path]
-        py = [_cell_to_xy(r, c, n, num_lines, U)[1] for r, c in path]
-        ax.plot(px, py, color=PATH_COLOR, linewidth=2, alpha=0.8, zorder=5)
+        px = [_cell_center(r, c, n, U)[0] for r, c in path]
+        py = [_cell_center(r, c, n, U)[1] for r, c in path]
+        ax.plot(px, py, color=PATH_COLOR, linewidth=2, alpha=0.8, zorder=6)
 
     if agent_pos is not None:
-        cx, cy = _cell_to_xy(*agent_pos, n, num_lines, U)
+        cx, cy = _cell_center(*agent_pos, n, U)
         circle = plt.Circle(
-            (cx, cy), U / 8,
+            (cx, cy), U * 0.3,
             facecolor=AGENT_COLOR, edgecolor="darkred",
             linewidth=1.5, zorder=7,
         )
@@ -187,10 +157,10 @@ def render_maze(
     if title:
         ax.set_title(title, fontsize=11, fontweight="bold")
 
-    total_w = (4 * n + 1) * U / 4
-    total_h = (2 * n + 1) * U / 4
-    ax.set_xlim(-U / 4, total_w + U / 4)
-    ax.set_ylim(-U / 4, total_h + U / 4)
+    total_w = (2 * n + 1) * U
+    total_h = (2 * n + 1) * U
+    ax.set_xlim(-U * 0.5, total_w + U * 0.5)
+    ax.set_ylim(-U * 0.5, total_h + U * 0.5)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -235,9 +205,8 @@ def render_training_snapshot(
 
     n = maze.size
     U = 40.0
-    num_lines = 2 * n + 1
 
-    _render_ascii(ax, maze, U)
+    _draw_walls(ax, maze, U)
 
     vmax = max(visit_counts.max(), 1)
     for r in range(n):
@@ -245,22 +214,22 @@ def render_training_snapshot(
             if visit_counts[r][c] > 0:
                 intensity = visit_counts[r][c] / vmax
                 color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
-                cx, cy = _cell_to_xy(r, c, n, num_lines, U)
+                cx, cy = _cell_center(r, c, n, U)
                 rect = plt.Rectangle(
-                    (cx - U / 8, cy - U / 8), U / 4, U / 4,
-                    facecolor=color, alpha=0.4, zorder=2,
+                    (cx - U * 0.4, cy - U * 0.4), U * 0.8, U * 0.8,
+                    facecolor=color, alpha=0.4, zorder=3,
                 )
                 ax.add_patch(rect)
 
     if len(trajectory) > 1:
-        px = [_cell_to_xy(r, c, n, num_lines, U)[0] for r, c in trajectory]
-        py = [_cell_to_xy(r, c, n, num_lines, U)[1] for r, c in trajectory]
-        ax.plot(px, py, color=PATH_COLOR, linewidth=1.5, alpha=0.8, zorder=5)
+        px = [_cell_center(r, c, n, U)[0] for r, c in trajectory]
+        py = [_cell_center(r, c, n, U)[1] for r, c in trajectory]
+        ax.plot(px, py, color=PATH_COLOR, linewidth=1.5, alpha=0.8, zorder=6)
 
     if trajectory:
-        cx, cy = _cell_to_xy(*trajectory[-1], n, num_lines, U)
+        cx, cy = _cell_center(*trajectory[-1], n, U)
         circle = plt.Circle(
-            (cx, cy), U / 8,
+            (cx, cy), U * 0.3,
             facecolor=AGENT_COLOR, edgecolor="darkred",
             linewidth=1.5, zorder=7,
         )
@@ -274,10 +243,10 @@ def render_training_snapshot(
 
     ax.set_title("\n".join(title_parts), fontsize=9, fontweight="bold")
 
-    total_w = (4 * n + 1) * U / 4
-    total_h = (2 * n + 1) * U / 4
-    ax.set_xlim(-U / 4, total_w + U / 4)
-    ax.set_ylim(-U / 4, total_h + U / 4)
+    total_w = (2 * n + 1) * U
+    total_h = (2 * n + 1) * U
+    ax.set_xlim(-U * 0.5, total_w + U * 0.5)
+    ax.set_ylim(-U * 0.5, total_h + U * 0.5)
     ax.set_aspect("equal")
     ax.axis("off")
 
