@@ -22,11 +22,7 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data - maze files downloaded at runtime
-data/mazes/classic/*.txt
-data/mazes/training/*.txt
-!data/mazes/.gitkeep
-
+# Data - maze files bundled in repo
 # OS
 .DS_Store
 Thumbs.db
