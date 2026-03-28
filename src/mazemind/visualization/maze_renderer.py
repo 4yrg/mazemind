@@ -21,6 +21,46 @@ GOAL_COLOR = "#f39c12"
 VISITED_CMAP = "YlOrRd"
 
 
+def _build_wall_grid(maze: MazeData, scale: int = 10) -> np.ndarray:
+    n = maze.size
+    h = n * scale + (n + 1) * 2
+    w = n * scale + (n + 1) * 2
+    grid = np.ones((h, w, 3))
+
+    def cell_origin(r, c):
+        return ((r + 1) * 2 + r * scale, (c + 1) * 2 + c * scale)
+
+    for r in range(n):
+        for c in range(n):
+            top, left = cell_origin(r, c)
+            walls = maze.walls[r][c]
+
+            grid[top:top + scale, left:left + scale] = [0.96, 0.96, 0.98]
+
+            if walls["N"]:
+                y = top - 2
+                grid[y:y + 2, left - 2:left + scale + 2] = [0.17, 0.24, 0.31]
+
+            if walls["S"]:
+                y = top + scale
+                grid[y:y + 2, left - 2:left + scale + 2] = [0.17, 0.24, 0.31]
+
+            if walls["W"]:
+                x = left - 2
+                grid[top - 2:top + scale + 2, x:x + 2] = [0.17, 0.24, 0.31]
+
+            if walls["E"]:
+                x = left + scale
+                grid[top - 2:top + scale + 2, x:x + 2] = [0.17, 0.24, 0.31]
+
+    grid[0:2, :] = [0.17, 0.24, 0.31]
+    grid[-2:, :] = [0.17, 0.24, 0.31]
+    grid[:, 0:2] = [0.17, 0.24, 0.31]
+    grid[:, -2:] = [0.17, 0.24, 0.31]
+
+    return grid
+
+
 def render_maze(
     maze: MazeData,
     ax: Optional[Axes] = None,
@@ -37,10 +77,19 @@ def render_maze(
         fig = ax.get_figure()
 
     n = maze.size
-    ax.set_xlim(-0.5, n - 0.5)
-    ax.set_ylim(-0.5, n - 0.5)
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
+    scale = 10
+
+    if show_walls:
+        wall_grid = _build_wall_grid(maze, scale)
+        ax.imshow(wall_grid, origin="lower", interpolation="nearest")
+    else:
+        blank = np.ones((n * scale + (n + 1) * 2, n * scale + (n + 1) * 2, 3))
+        ax.imshow(blank, origin="lower", interpolation="nearest")
+
+    def cell_to_pixel(r, c):
+        top = (r + 1) * 2 + r * scale + scale // 2
+        left = (c + 1) * 2 + c * scale + scale // 2
+        return left, top
 
     if visit_counts is not None:
         vmax = max(visit_counts.max(), 1)
@@ -49,66 +98,55 @@ def render_maze(
                 if visit_counts[r][c] > 0:
                     intensity = visit_counts[r][c] / vmax
                     color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
-                    ax.add_patch(plt.Rectangle(
-                        (c - 0.5, r - 0.5), 1, 1,
+                    px, py = cell_to_pixel(r, c)
+                    rect = plt.Rectangle(
+                        (px - scale // 2, py - scale // 2), scale, scale,
                         facecolor=color, alpha=0.5,
-                    ))
-
-    if show_walls:
-        for r in range(n):
-            for c in range(n):
-                walls = maze.walls[r][c]
-                x, y = c, r
-                if walls["N"]:
-                    ax.plot([x - 0.5, x + 0.5], [y - 0.5, y - 0.5],
-                            color=WALL_COLOR, linewidth=2)
-                if walls["W"]:
-                    ax.plot([x - 0.5, x - 0.5], [y - 0.5, y + 0.5],
-                            color=WALL_COLOR, linewidth=2)
-                if r == 0 and walls["S"]:
-                    ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5],
-                            color=WALL_COLOR, linewidth=2)
-                if c == n - 1 and walls["E"]:
-                    ax.plot([x + 0.5, x + 0.5], [y - 0.5, y + 0.5],
-                            color=WALL_COLOR, linewidth=2)
+                    )
+                    ax.add_patch(rect)
 
     for gr, gc in maze.goals:
-        ax.add_patch(plt.Rectangle(
-            (gc - 0.4, gr - 0.4), 0.8, 0.8,
+        px, py = cell_to_pixel(gr, gc)
+        rect = plt.Rectangle(
+            (px - scale // 2 + 1, py - scale // 2 + 1), scale - 2, scale - 2,
             facecolor=GOAL_COLOR, alpha=0.6, edgecolor="none",
-        ))
-        ax.text(gc, gr, "G", ha="center", va="center",
-                fontsize=8, fontweight="bold", color="white")
+        )
+        ax.add_patch(rect)
+        ax.text(px, py, "G", ha="center", va="center",
+                fontsize=6, fontweight="bold", color="white", zorder=6)
 
     sr, sc = maze.start
-    ax.add_patch(plt.Rectangle(
-        (sc - 0.4, sr - 0.4), 0.8, 0.8,
+    px, py = cell_to_pixel(sr, sc)
+    rect = plt.Rectangle(
+        (px - scale // 2 + 1, py - scale // 2 + 1), scale - 2, scale - 2,
         facecolor=START_COLOR, alpha=0.6, edgecolor="none",
-    ))
-    ax.text(sc, sr, "S", ha="center", va="center",
-            fontsize=8, fontweight="bold", color="white")
+    )
+    ax.add_patch(rect)
+    ax.text(px, py, "S", ha="center", va="center",
+            fontsize=6, fontweight="bold", color="white", zorder=6)
 
     if path and len(path) > 1:
-        path_y = [p[0] for p in path]
-        path_x = [p[1] for p in path]
-        ax.plot(path_x, path_y, color=PATH_COLOR, linewidth=2,
-                alpha=0.7, zorder=3)
+        path_x = [cell_to_pixel(r, c)[0] for r, c in path]
+        path_y = [cell_to_pixel(r, c)[1] for r, c in path]
+        ax.plot(path_x, path_y, color=PATH_COLOR, linewidth=1.5,
+                alpha=0.8, zorder=4)
         ax.plot(path_x, path_y, "o", color=PATH_COLOR,
-                markersize=3, alpha=0.5, zorder=3)
+                markersize=2, alpha=0.5, zorder=4)
 
     if agent_pos is not None:
-        ar, ac = agent_pos
-        ax.add_patch(plt.Circle(
-            (ac, ar), 0.3,
+        px, py = cell_to_pixel(*agent_pos)
+        circle = plt.Circle(
+            (px, py), scale // 3,
             facecolor=AGENT_COLOR, edgecolor="darkred",
-            linewidth=2, zorder=5,
-        ))
+            linewidth=1, zorder=7,
+        )
+        ax.add_patch(circle)
 
     if title:
-        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.set_title(title, fontsize=11, fontweight="bold")
 
-    ax.set_xticks([])
-    ax.set_yticks([])
+    ax.axis("off")
+    ax.set_aspect("equal")
 
     return fig, ax
 
@@ -150,66 +188,72 @@ def render_training_snapshot(
         fig = ax.get_figure()
 
     n = maze.size
-    ax.set_xlim(-0.5, n - 0.5)
-    ax.set_ylim(-0.5, n - 0.5)
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
+    scale = 10
+    wall_grid = _build_wall_grid(maze, scale)
+    ax.imshow(wall_grid, origin="lower", interpolation="nearest")
+
+    def cell_to_pixel(r, c):
+        top = (r + 1) * 2 + r * scale + scale // 2
+        left = (c + 1) * 2 + c * scale + scale // 2
+        return left, top
 
     vmax = max(visit_counts.max(), 1)
     for r in range(n):
         for c in range(n):
             if visit_counts[r][c] > 0:
                 intensity = visit_counts[r][c] / vmax
-                color = plt.cm.get_cmap("YlOrRd")(intensity)
-                ax.add_patch(plt.Rectangle(
-                    (c - 0.5, r - 0.5), 1, 1,
+                color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
+                px, py = cell_to_pixel(r, c)
+                rect = plt.Rectangle(
+                    (px - scale // 2, py - scale // 2), scale, scale,
                     facecolor=color, alpha=0.4,
-                ))
-
-    for r in range(n):
-        for c in range(n):
-            walls = maze.walls[r][c]
-            x, y = c, r
-            if walls["N"]:
-                ax.plot([x - 0.5, x + 0.5], [y - 0.5, y - 0.5], color="#2c3e50", linewidth=1.5)
-            if walls["W"]:
-                ax.plot([x - 0.5, x - 0.5], [y - 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
-            if r == 0 and walls["S"]:
-                ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
-            if c == n - 1 and walls["E"]:
-                ax.plot([x + 0.5, x + 0.5], [y - 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
+                )
+                ax.add_patch(rect)
 
     for gr, gc in maze.goals:
-        ax.add_patch(plt.Rectangle((gc - 0.4, gr - 0.4), 0.8, 0.8,
-                                    facecolor="#f39c12", alpha=0.6, edgecolor="none"))
-        ax.text(gc, gr, "G", ha="center", va="center", fontsize=8, fontweight="bold", color="white")
+        px, py = cell_to_pixel(gr, gc)
+        rect = plt.Rectangle(
+            (px - scale // 2 + 1, py - scale // 2 + 1), scale - 2, scale - 2,
+            facecolor=GOAL_COLOR, alpha=0.6, edgecolor="none",
+        )
+        ax.add_patch(rect)
+        ax.text(px, py, "G", ha="center", va="center",
+                fontsize=6, fontweight="bold", color="white", zorder=6)
 
     sr, sc = maze.start
-    ax.add_patch(plt.Rectangle((sc - 0.4, sr - 0.4), 0.8, 0.8,
-                                facecolor="#2ecc71", alpha=0.6, edgecolor="none"))
-    ax.text(sc, sr, "S", ha="center", va="center", fontsize=8, fontweight="bold", color="white")
+    px, py = cell_to_pixel(sr, sc)
+    rect = plt.Rectangle(
+        (px - scale // 2 + 1, py - scale // 2 + 1), scale - 2, scale - 2,
+        facecolor=START_COLOR, alpha=0.6, edgecolor="none",
+    )
+    ax.add_patch(rect)
+    ax.text(px, py, "S", ha="center", va="center",
+            fontsize=6, fontweight="bold", color="white", zorder=6)
 
     if len(trajectory) > 1:
-        ty = [p[0] for p in trajectory]
-        tx = [p[1] for p in trajectory]
-        ax.plot(tx, ty, color="#3498db", linewidth=2, alpha=0.8, zorder=3)
-        ax.plot(tx, ty, "o", color="#3498db", markersize=2, alpha=0.4, zorder=3)
+        path_x = [cell_to_pixel(r, c)[0] for r, c in trajectory]
+        path_y = [cell_to_pixel(r, c)[1] for r, c in trajectory]
+        ax.plot(path_x, path_y, color=PATH_COLOR, linewidth=1.5, alpha=0.8, zorder=4)
+        ax.plot(path_x, path_y, "o", color=PATH_COLOR, markersize=1.5, alpha=0.4, zorder=4)
 
     if trajectory:
-        ar, ac = trajectory[-1]
-        ax.add_patch(plt.Circle((ac, ar), 0.3, facecolor="#e74c3c", edgecolor="darkred",
-                                 linewidth=2, zorder=5))
+        px, py = cell_to_pixel(*trajectory[-1])
+        circle = plt.Circle(
+            (px, py), scale // 3,
+            facecolor=AGENT_COLOR, edgecolor="darkred",
+            linewidth=1, zorder=7,
+        )
+        ax.add_patch(circle)
 
     status = "SUCCESS" if success else "FAIL"
-    color = "#2ecc71" if success else "#e74c3c"
     title_parts = [f"{agent_name} - Episode {episode}"]
     title_parts.append(f"[{status}] Steps: {steps} | Reward: {reward:.0f}")
     if planning_steps > 0:
         title_parts.append(f"Model: {model_size} transitions | Planning: {planning_steps} steps/real step")
 
-    ax.set_title("\n".join(title_parts), fontsize=10, fontweight="bold", color=color if success else "#333")
-    ax.set_xticks([])
-    ax.set_yticks([])
+    ax.set_title("\n".join(title_parts), fontsize=9, fontweight="bold")
+    ax.axis("off")
+    ax.set_aspect("equal")
 
     return fig, ax
 

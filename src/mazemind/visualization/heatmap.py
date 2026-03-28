@@ -12,6 +12,26 @@ from matplotlib.axes import Axes
 from mazemind.envs.maze_parser import MazeData, ACTION_NAMES, ACTION_DELTAS
 
 
+def _overlay_walls(ax: Axes, maze: MazeData, linewidth: float = 1.5):
+    n = maze.size
+    for r in range(n):
+        for c in range(n):
+            walls = maze.walls[r][c]
+            x, y = c, r
+            if walls["N"]:
+                ax.plot([x - 0.5, x + 0.5], [y - 0.5, y - 0.5],
+                        color="black", linewidth=linewidth)
+            if walls["S"]:
+                ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5],
+                        color="black", linewidth=linewidth)
+            if walls["W"]:
+                ax.plot([x - 0.5, x - 0.5], [y - 0.5, y + 0.5],
+                        color="black", linewidth=linewidth)
+            if walls["E"]:
+                ax.plot([x + 0.5, x + 0.5], [y - 0.5, y + 0.5],
+                        color="black", linewidth=linewidth)
+
+
 def render_heatmap(
     data: np.ndarray,
     ax: Optional[Axes] = None,
@@ -37,22 +57,7 @@ def render_heatmap(
                             fontsize=6, color=color)
 
     if maze is not None:
-        n = maze.size
-        for r in range(n):
-            for c in range(n):
-                walls = maze.walls[r][c]
-                if walls["N"]:
-                    ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5],
-                            color="black", linewidth=1.5)
-                if walls["W"]:
-                    ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5],
-                            color="black", linewidth=1.5)
-                if r == 0 and walls["S"]:
-                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5],
-                            color="black", linewidth=1.5)
-                if c == n - 1 and walls["E"]:
-                    ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5],
-                            color="black", linewidth=1.5)
+        _overlay_walls(ax, maze)
 
     fig.colorbar(im, ax=ax, shrink=0.8)
     ax.set_title(title, fontsize=11, fontweight="bold")
@@ -108,6 +113,8 @@ def render_q_value_map(
                         lw=max(abs(q) / 10.0, 0.5),
                     ),
                 )
+
+    _overlay_walls(ax, maze)
 
     for gr, gc in maze.goals:
         ax.add_patch(plt.Rectangle(
@@ -166,18 +173,7 @@ def render_model_knowledge(
         knowledge[r][c] += 1
 
     im = ax.imshow(knowledge, cmap="Purples", interpolation="nearest", aspect="equal")
-
-    for r in range(n):
-        for c in range(n):
-            walls = maze.walls[r][c]
-            if walls["N"]:
-                ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=1.5)
-            if walls["W"]:
-                ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
-            if r == 0 and walls["S"]:
-                ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=1.5)
-            if c == n - 1 and walls["E"]:
-                ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
+    _overlay_walls(ax, maze)
 
     for gr, gc in maze.goals:
         ax.add_patch(plt.Rectangle(
@@ -223,18 +219,7 @@ def render_exploration_timeline(
         ax = axes[i]
         n = maze.size
         im = ax.imshow(snap.visit_counts, cmap=cmap, interpolation="nearest", aspect="equal")
-
-        for r in range(n):
-            for c in range(n):
-                walls = maze.walls[r][c]
-                if walls["N"]:
-                    ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=0.5)
-                if walls["W"]:
-                    ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
-                if r == 0 and walls["S"]:
-                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=0.5)
-                if c == n - 1 and walls["E"]:
-                    ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
+        _overlay_walls(ax, maze, linewidth=0.5)
 
         for gr, gc in maze.goals:
             ax.add_patch(plt.Rectangle((gc - 0.3, gr - 0.3), 0.6, 0.6,
