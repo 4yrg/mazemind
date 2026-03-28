@@ -17,59 +17,56 @@ START_COLOR = "#2ecc71"
 GOAL_COLOR = "#f39c12"
 VISITED_CMAP = "YlOrRd"
 
-WALL_THICKNESS = 2
-CELL_SIZE = 10
+WT = 2
+CS = 10
 
 
 def _build_maze_image(maze: MazeData) -> np.ndarray:
     n = maze.size
-    wt = WALL_THICKNESS
-    cs = CELL_SIZE
-
-    grid_h = n * cs + (n + 1) * wt
-    grid_w = n * cs + (n + 1) * wt
+    grid_h = n * CS + (n + 1) * WT
+    grid_w = n * CS + (n + 1) * WT
     img = np.ones((grid_h, grid_w, 3))
 
+    def cell_top(r):
+        return r * (CS + WT) + WT
+
+    def cell_left(c):
+        return c * (CS + WT) + WT
+
     def wall_row(r):
-        return r * (cs + wt)
+        return r * (CS + WT) + CS + WT
 
     def wall_col(c):
-        return c * (cs + wt)
+        return c * (CS + WT) + CS + WT
 
     for r in range(n):
         for c in range(n):
-            top = wall_row(r) + wt
-            left = wall_col(c) + wt
-            img[top:top + cs, left:left + cs] = [0.96, 0.96, 0.98]
+            ct = cell_top(r)
+            cl = cell_left(c)
+            img[ct:ct + CS, cl:cl + CS] = [0.96, 0.96, 0.98]
 
             if maze.walls[r][c]["N"]:
-                wy = wall_row(r)
-                wx = wall_col(c)
-                img[wy:wy + wt, wx:wx + cs + 2 * wt] = [0.17, 0.24, 0.31]
+                wy = wall_row(r - 1) if r > 0 else 0
+                img[wy:wy + WT, cl - WT:cl + CS + WT] = [0.17, 0.24, 0.31]
 
             if maze.walls[r][c]["S"]:
-                wy = wall_row(r + 1)
-                wx = wall_col(c)
-                img[wy:wy + wt, wx:wx + cs + 2 * wt] = [0.17, 0.24, 0.31]
+                wy = wall_row(r)
+                img[wy:wy + WT, cl - WT:cl + CS + WT] = [0.17, 0.24, 0.31]
 
             if maze.walls[r][c]["W"]:
-                wy = wall_row(r)
-                wx = wall_col(c)
-                img[wy:wy + cs + 2 * wt, wx:wx + wt] = [0.17, 0.24, 0.31]
+                wx = wall_col(c - 1) if c > 0 else 0
+                img[ct - WT:ct + CS + WT, wx:wx + WT] = [0.17, 0.24, 0.31]
 
             if maze.walls[r][c]["E"]:
-                wy = wall_row(r)
-                wx = wall_col(c + 1)
-                img[wy:wy + cs + 2 * wt, wx:wx + wt] = [0.17, 0.24, 0.31]
+                wx = wall_col(c)
+                img[ct - WT:ct + CS + WT, wx:wx + WT] = [0.17, 0.24, 0.31]
 
     return img
 
 
 def _cell_to_pixel(r, c):
-    wt = WALL_THICKNESS
-    cs = CELL_SIZE
-    py = r * (cs + wt) + wt + cs // 2
-    px = c * (cs + wt) + wt + cs // 2
+    py = r * (CS + WT) + WT + CS // 2
+    px = c * (CS + WT) + WT + CS // 2
     return px, py
 
 
@@ -89,14 +86,12 @@ def render_maze(
         fig = ax.get_figure()
 
     n = maze.size
-    cs = CELL_SIZE
-    wt = WALL_THICKNESS
 
     if show_walls:
         img = _build_maze_image(maze)
     else:
-        grid_h = n * cs + (n + 1) * wt
-        grid_w = n * cs + (n + 1) * wt
+        grid_h = n * CS + (n + 1) * WT
+        grid_w = n * CS + (n + 1) * WT
         img = np.ones((grid_h, grid_w, 3))
 
     ax.imshow(img, origin="upper", interpolation="nearest")
@@ -110,7 +105,7 @@ def render_maze(
                     color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
                     px, py = _cell_to_pixel(r, c)
                     rect = plt.Rectangle(
-                        (px - cs // 2, py - cs // 2), cs, cs,
+                        (px - CS // 2, py - CS // 2), CS, CS,
                         facecolor=color, alpha=0.5, zorder=2,
                     )
                     ax.add_patch(rect)
@@ -118,7 +113,7 @@ def render_maze(
     for gr, gc in maze.goals:
         px, py = _cell_to_pixel(gr, gc)
         rect = plt.Rectangle(
-            (px - cs // 2 + 1, py - cs // 2 + 1), cs - 2, cs - 2,
+            (px - CS // 2 + 1, py - CS // 2 + 1), CS - 2, CS - 2,
             facecolor=GOAL_COLOR, alpha=0.7, edgecolor="none", zorder=3,
         )
         ax.add_patch(rect)
@@ -128,7 +123,7 @@ def render_maze(
     sr, sc = maze.start
     px, py = _cell_to_pixel(sr, sc)
     rect = plt.Rectangle(
-        (px - cs // 2 + 1, py - cs // 2 + 1), cs - 2, cs - 2,
+        (px - CS // 2 + 1, py - CS // 2 + 1), CS - 2, CS - 2,
         facecolor=START_COLOR, alpha=0.7, edgecolor="none", zorder=3,
     )
     ax.add_patch(rect)
@@ -146,7 +141,7 @@ def render_maze(
     if agent_pos is not None:
         px, py = _cell_to_pixel(*agent_pos)
         circle = plt.Circle(
-            (px, py), cs // 3,
+            (px, py), CS // 3,
             facecolor=AGENT_COLOR, edgecolor="darkred",
             linewidth=1, zorder=7,
         )
@@ -198,9 +193,6 @@ def render_training_snapshot(
         fig = ax.get_figure()
 
     n = maze.size
-    cs = CELL_SIZE
-    wt = WALL_THICKNESS
-
     img = _build_maze_image(maze)
     ax.imshow(img, origin="upper", interpolation="nearest")
 
@@ -212,7 +204,7 @@ def render_training_snapshot(
                 color = plt.cm.get_cmap(VISITED_CMAP)(intensity)
                 px, py = _cell_to_pixel(r, c)
                 rect = plt.Rectangle(
-                    (px - cs // 2, py - cs // 2), cs, cs,
+                    (px - CS // 2, py - CS // 2), CS, CS,
                     facecolor=color, alpha=0.4, zorder=2,
                 )
                 ax.add_patch(rect)
@@ -220,7 +212,7 @@ def render_training_snapshot(
     for gr, gc in maze.goals:
         px, py = _cell_to_pixel(gr, gc)
         rect = plt.Rectangle(
-            (px - cs // 2 + 1, py - cs // 2 + 1), cs - 2, cs - 2,
+            (px - CS // 2 + 1, py - CS // 2 + 1), CS - 2, CS - 2,
             facecolor=GOAL_COLOR, alpha=0.7, edgecolor="none", zorder=3,
         )
         ax.add_patch(rect)
@@ -230,7 +222,7 @@ def render_training_snapshot(
     sr, sc = maze.start
     px, py = _cell_to_pixel(sr, sc)
     rect = plt.Rectangle(
-        (px - cs // 2 + 1, py - cs // 2 + 1), cs - 2, cs - 2,
+        (px - CS // 2 + 1, py - CS // 2 + 1), CS - 2, CS - 2,
         facecolor=START_COLOR, alpha=0.7, edgecolor="none", zorder=3,
     )
     ax.add_patch(rect)
@@ -246,7 +238,7 @@ def render_training_snapshot(
     if trajectory:
         px, py = _cell_to_pixel(*trajectory[-1])
         circle = plt.Circle(
-            (px, py), cs // 3,
+            (px, py), CS // 3,
             facecolor=AGENT_COLOR, edgecolor="darkred",
             linewidth=1, zorder=7,
         )

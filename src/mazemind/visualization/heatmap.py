@@ -11,42 +11,6 @@ from matplotlib.axes import Axes
 from mazemind.envs.maze_parser import MazeData, ACTION_NAMES, ACTION_DELTAS
 
 
-def _build_wall_mask(maze: MazeData) -> np.ndarray:
-    n = maze.size
-    cs = 10
-    wt = 2
-    grid_h = n * cs + (n + 1) * wt
-    grid_w = n * cs + (n + 1) * wt
-    mask = np.zeros((grid_h, grid_w))
-
-    def wall_row(r):
-        return r * (cs + wt)
-
-    def wall_col(c):
-        return c * (cs + wt)
-
-    for r in range(n):
-        for c in range(n):
-            if maze.walls[r][c]["N"]:
-                wy = wall_row(r)
-                wx = wall_col(c)
-                mask[wy:wy + wt, wx:wx + cs + 2 * wt] = 1
-            if maze.walls[r][c]["S"]:
-                wy = wall_row(r + 1)
-                wx = wall_col(c)
-                mask[wy:wy + wt, wx:wx + cs + 2 * wt] = 1
-            if maze.walls[r][c]["W"]:
-                wy = wall_row(r)
-                wx = wall_col(c)
-                mask[wy:wy + cs + 2 * wt, wx:wx + wt] = 1
-            if maze.walls[r][c]["E"]:
-                wy = wall_row(r)
-                wx = wall_col(c + 1)
-                mask[wy:wy + cs + 2 * wt, wx:wx + wt] = 1
-
-    return mask
-
-
 def _overlay_walls(ax: Axes, maze: MazeData, linewidth: float = 1.5):
     n = maze.size
     for r in range(n):
