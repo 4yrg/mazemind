@@ -83,6 +83,20 @@ class TrainingMetrics:
 
 
 @dataclass
+class EpisodeSnapshot:
+    episode: int
+    path: list[tuple[int, int]]
+    visit_counts: np.ndarray
+    model_size: int
+    planning_steps: int
+    q_table_snapshot: np.ndarray
+    success: bool
+    steps: int
+    reward: float
+    epsilon: float
+
+
+@dataclass
 class ComparisonResult:
     dyna_q_metrics: TrainingMetrics
     sarsa_metrics: TrainingMetrics

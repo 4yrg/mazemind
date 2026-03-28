@@ -144,3 +144,110 @@ def render_heatmap_comparison(
     render_heatmap(data_right, ax=ax2, title=title_right, cmap=cmap, maze=maze)
     plt.tight_layout()
     return fig
+
+
+def render_model_knowledge(
+    maze: MazeData,
+    model: dict[tuple[int, int], tuple[float, int]],
+    ax: Optional[Axes] = None,
+    title: str = "Dyna-Q Internal Model Knowledge",
+) -> tuple[Figure, Axes]:
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+    else:
+        fig = ax.get_figure()
+
+    n = maze.size
+    knowledge = np.zeros((n, n))
+
+    for (si, _action), (_reward, _nsi) in model.items():
+        r, c = si // n, si % n
+        knowledge[r][c] += 1
+
+    im = ax.imshow(knowledge, cmap="Purples", interpolation="nearest", aspect="equal")
+
+    for r in range(n):
+        for c in range(n):
+            walls = maze.walls[r][c]
+            if walls["N"]:
+                ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=1.5)
+            if walls["S"]:
+                ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=1.5)
+            if walls["W"]:
+                ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
+            if walls["E"]:
+                ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
+
+    for gr, gc in maze.goals:
+        ax.add_patch(plt.Rectangle(
+            (gc - 0.4, gr - 0.4), 0.8, 0.8,
+            facecolor="#f39c12", alpha=0.6, edgecolor="none",
+        ))
+        ax.text(gc, gr, "G", ha="center", va="center",
+                fontsize=8, fontweight="bold", color="white")
+
+    sr, sc = maze.start
+    ax.add_patch(plt.Rectangle(
+        (sc - 0.4, sr - 0.4), 0.8, 0.8,
+        facecolor="#2ecc71", alpha=0.6, edgecolor="none",
+    ))
+    ax.text(sc, sr, "S", ha="center", va="center",
+            fontsize=8, fontweight="bold", color="white")
+
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Known actions per cell")
+    ax.set_title(f"{title}\n({len(model)} state-action pairs known)", fontsize=11, fontweight="bold")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    return fig, ax
+
+
+def render_exploration_timeline(
+    snapshots: list,
+    maze: MazeData,
+    agent_name: str = "",
+) -> Figure:
+    n_snaps = len(snapshots)
+    cols = min(n_snaps, 5)
+    rows = (n_snaps + cols - 1) // cols
+
+    fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 4 * rows))
+    if n_snaps == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+
+    cmap = "Blues" if "Dyna" in agent_name else "Reds"
+
+    for i, snap in enumerate(snapshots):
+        ax = axes[i]
+        n = maze.size
+        im = ax.imshow(snap.visit_counts, cmap=cmap, interpolation="nearest", aspect="equal")
+
+        for r in range(n):
+            for c in range(n):
+                walls = maze.walls[r][c]
+                if walls["N"]:
+                    ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=0.5)
+                if walls["S"]:
+                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=0.5)
+                if walls["W"]:
+                    ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
+                if walls["E"]:
+                    ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
+
+        for gr, gc in maze.goals:
+            ax.add_patch(plt.Rectangle((gc - 0.3, gr - 0.3), 0.6, 0.6,
+                                        facecolor="#f39c12", alpha=0.5, edgecolor="none"))
+
+        explored = int(np.count_nonzero(snap.visit_counts))
+        extra = f" | Model: {snap.model_size}" if snap.model_size > 0 else ""
+        ax.set_title(f"Ep {snap.episode}\n{explored}/256 cells{extra}", fontsize=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    for i in range(n_snaps, len(axes)):
+        axes[i].set_visible(False)
+
+    fig.suptitle(f"{agent_name} Exploration Timeline", fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    return fig
