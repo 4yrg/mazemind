@@ -62,13 +62,13 @@ def render_maze(
                 if walls["N"]:
                     ax.plot([x - 0.5, x + 0.5], [y - 0.5, y - 0.5],
                             color=WALL_COLOR, linewidth=2)
-                if walls["S"]:
-                    ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5],
-                            color=WALL_COLOR, linewidth=2)
                 if walls["W"]:
                     ax.plot([x - 0.5, x - 0.5], [y - 0.5, y + 0.5],
                             color=WALL_COLOR, linewidth=2)
-                if walls["E"]:
+                if r == 0 and walls["S"]:
+                    ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5],
+                            color=WALL_COLOR, linewidth=2)
+                if c == n - 1 and walls["E"]:
                     ax.plot([x + 0.5, x + 0.5], [y - 0.5, y + 0.5],
                             color=WALL_COLOR, linewidth=2)
 
@@ -172,11 +172,11 @@ def render_training_snapshot(
             x, y = c, r
             if walls["N"]:
                 ax.plot([x - 0.5, x + 0.5], [y - 0.5, y - 0.5], color="#2c3e50", linewidth=1.5)
-            if walls["S"]:
-                ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
             if walls["W"]:
                 ax.plot([x - 0.5, x - 0.5], [y - 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
-            if walls["E"]:
+            if r == 0 and walls["S"]:
+                ax.plot([x - 0.5, x + 0.5], [y + 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
+            if c == n - 1 and walls["E"]:
                 ax.plot([x + 0.5, x + 0.5], [y - 0.5, y + 0.5], color="#2c3e50", linewidth=1.5)
 
     for gr, gc in maze.goals:

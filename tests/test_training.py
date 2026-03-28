@@ -18,7 +18,7 @@ MAZE_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'mazes', 'class
 
 @pytest.fixture
 def maze():
-    return parse_maze_file(os.path.join(MAZE_DIR, "50.txt"))
+    return parse_maze_file(os.path.join(MAZE_DIR, "AAMC16Maze.txt"))
 
 
 class TestTrainingOrchestrator:

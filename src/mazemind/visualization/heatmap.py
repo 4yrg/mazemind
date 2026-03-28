@@ -37,19 +37,20 @@ def render_heatmap(
                             fontsize=6, color=color)
 
     if maze is not None:
-        for r in range(maze.size):
-            for c in range(maze.size):
+        n = maze.size
+        for r in range(n):
+            for c in range(n):
                 walls = maze.walls[r][c]
                 if walls["N"]:
                     ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5],
                             color="black", linewidth=1.5)
-                if walls["S"]:
-                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5],
-                            color="black", linewidth=1.5)
                 if walls["W"]:
                     ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5],
                             color="black", linewidth=1.5)
-                if walls["E"]:
+                if r == 0 and walls["S"]:
+                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5],
+                            color="black", linewidth=1.5)
+                if c == n - 1 and walls["E"]:
                     ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5],
                             color="black", linewidth=1.5)
 
@@ -171,11 +172,11 @@ def render_model_knowledge(
             walls = maze.walls[r][c]
             if walls["N"]:
                 ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=1.5)
-            if walls["S"]:
-                ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=1.5)
             if walls["W"]:
                 ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
-            if walls["E"]:
+            if r == 0 and walls["S"]:
+                ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=1.5)
+            if c == n - 1 and walls["E"]:
                 ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=1.5)
 
     for gr, gc in maze.goals:
@@ -228,11 +229,11 @@ def render_exploration_timeline(
                 walls = maze.walls[r][c]
                 if walls["N"]:
                     ax.plot([c - 0.5, c + 0.5], [r - 0.5, r - 0.5], color="black", linewidth=0.5)
-                if walls["S"]:
-                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=0.5)
                 if walls["W"]:
                     ax.plot([c - 0.5, c - 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
-                if walls["E"]:
+                if r == 0 and walls["S"]:
+                    ax.plot([c - 0.5, c + 0.5], [r + 0.5, r + 0.5], color="black", linewidth=0.5)
+                if c == n - 1 and walls["E"]:
                     ax.plot([c + 0.5, c + 0.5], [r - 0.5, r + 0.5], color="black", linewidth=0.5)
 
         for gr, gc in maze.goals:
