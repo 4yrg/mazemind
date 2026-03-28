@@ -25,6 +25,9 @@ from mazemind.visualization.maze_renderer import (
 from mazemind.visualization.heatmap import (
     render_heatmap, render_q_value_map, render_model_knowledge, render_exploration_timeline,
 )
+from mazemind.visualization.training_viz import (
+    render_side_by_side_training, render_q_table_heatmap, render_policy_grid,
+)
 
 
 st.set_page_config(
@@ -179,13 +182,68 @@ def main():
     st.markdown("---")
     st.header("Environment Discovery Visualization")
 
-    tab_timeline, tab_coverage, tab_model, tab_replay, tab_technique = st.tabs([
-        "Discovery Timeline", "Exploration Coverage", "Model Knowledge (Dyna-Q)",
+    tab_live, tab_timeline, tab_coverage, tab_model, tab_replay, tab_technique = st.tabs([
+        "Live Training", "Discovery Timeline", "Exploration Coverage", "Model Knowledge (Dyna-Q)",
         "Episode Replay", "Technique Comparison",
     ])
 
     dq_snaps = results["dq_snapshots"]
     ss_snaps = results["ss_snapshots"]
+
+    with tab_live:
+        st.subheader("Live Training Process")
+        st.markdown("Watch how each agent's **Q-table** and **policy** evolve during training.")
+
+        snap_episodes = [s.episode for s in dq_snaps]
+        selected_ep = st.select_slider(
+            "Select episode to view training state:",
+            options=snap_episodes,
+            value=snap_episodes[min(3, len(snap_episodes) - 1)],
+            key="live_ep_slider",
+        )
+
+        dq_idx = next(i for i, s in enumerate(dq_snaps) if s.episode == selected_ep)
+        ss_idx = next(i for i, s in enumerate(ss_snaps) if s.episode == selected_ep)
+        dq_s = dq_snaps[dq_idx]
+        ss_s = ss_snaps[ss_idx]
+
+        fig = render_side_by_side_training(
+            maze,
+            dq_q_table=dq_s.q_table_snapshot,
+            ss_q_table=ss_s.q_table_snapshot,
+            dq_trajectory=dq_s.path,
+            ss_trajectory=ss_s.path,
+            dq_visits=dq_s.visit_counts,
+            ss_visits=ss_s.visit_counts,
+            episode=selected_ep,
+            dq_steps=dq_s.steps, ss_steps=ss_s.steps,
+            dq_reward=dq_s.reward, ss_reward=ss_s.reward,
+            dq_epsilon=dq_s.epsilon, ss_epsilon=ss_s.epsilon,
+            dq_success=dq_s.success, ss_success=ss_s.success,
+            dq_model_size=dq_s.model_size,
+        )
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.markdown("---")
+        st.markdown("""
+        **What you're seeing:**
+        - **Grid**: Agent's path trail (blue) with visited cells (heatmap) and current position (red dot)
+        - **Q-Table**: Color shows max Q-value per cell (blue=negative, red=positive). Goal cell highlighted in gold.
+        - **Policy**: Arrows show the best action per cell. Green=positive Q, red=negative Q. Size = magnitude.
+        """)
+
+        col_dq, col_ss = st.columns(2)
+        with col_dq:
+            st.markdown(f"**Dyna-Q** at episode {selected_ep}:")
+            st.markdown(f"- Model size: **{dq_s.model_size}** transitions")
+            st.markdown(f"- Planning: **{dq_s.planning_steps}** simulated steps per real step")
+            st.markdown(f"- Steps: {dq_s.steps} | Reward: {dq_s.reward:.0f}")
+        with col_ss:
+            st.markdown(f"**SARSA** at episode {selected_ep}:")
+            st.markdown(f"- No internal model (model-free)")
+            st.markdown(f"- 1 Q-update per real step")
+            st.markdown(f"- Steps: {ss_s.steps} | Reward: {ss_s.reward:.0f}")
 
     with tab_timeline:
         st.subheader("Episode-by-Episode Discovery")
