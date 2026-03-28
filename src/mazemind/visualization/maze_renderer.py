@@ -53,13 +53,9 @@ def _render_ascii(ax: Axes, maze: MazeData, U: float = 40.0):
     lines = _maze_to_ascii(maze)
     n = maze.size
     num_lines = len(lines)
+    lw = 5
 
-    for y, line in enumerate(lines):
-        for x, ch in enumerate(line):
-            if ch == "o":
-                ax.plot(x * U / 4, (num_lines - 1 - y) * U / 4, "o",
-                        color=WALL_COLOR, markersize=3, zorder=2)
-
+    h_segs = []
     for y, line in enumerate(lines):
         if y % 2 == 0:
             for x in range(len(line)):
@@ -67,9 +63,9 @@ def _render_ascii(ax: Axes, maze: MazeData, U: float = 40.0):
                     vx1 = x * U / 4
                     vx2 = (x + 3) * U / 4
                     vy = (num_lines - 1 - y) * U / 4
-                    ax.plot([vx1, vx2], [vy, vy], color=WALL_COLOR,
-                            linewidth=2.5, solid_capstyle="round", zorder=1)
+                    h_segs.append([(vx1, vy), (vx2, vy)])
 
+    v_segs = []
     for y, line in enumerate(lines):
         if y % 2 == 1:
             for x, ch in enumerate(line):
@@ -77,8 +73,27 @@ def _render_ascii(ax: Axes, maze: MazeData, U: float = 40.0):
                     vx = x * U / 4
                     vy1 = (num_lines - 1 - y) * U / 4
                     vy2 = (num_lines - y) * U / 4
-                    ax.plot([vx, vx], [vy1, vy2], color=WALL_COLOR,
-                            linewidth=2.5, solid_capstyle="round", zorder=1)
+                    v_segs.append([(vx, vy1), (vx, vy2)])
+
+    from matplotlib.collections import LineCollection
+
+    if h_segs:
+        lc_h = LineCollection(h_segs, colors=WALL_COLOR, linewidths=lw,
+                              capstyle="butt", zorder=1)
+        ax.add_collection(lc_h)
+
+    if v_segs:
+        lc_v = LineCollection(v_segs, colors=WALL_COLOR, linewidths=lw,
+                              capstyle="butt", zorder=1)
+        ax.add_collection(lc_v)
+
+    for y, line in enumerate(lines):
+        for x, ch in enumerate(line):
+            if ch == "o":
+                vx = x * U / 4
+                vy = (num_lines - 1 - y) * U / 4
+                ax.plot(vx, vy, "s", color=WALL_COLOR,
+                        markersize=lw * 1.1, zorder=2)
 
     for gr, gc in maze.goals:
         text_row = 2 * (n - 1 - gr) + 1
