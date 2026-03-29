@@ -436,3 +436,125 @@ def render_side_by_side_training(
     )
 
     return fig
+
+
+def render_playback_frame(
+    maze: MazeData,
+    q_table: np.ndarray,
+    trajectory: list[tuple[int, int]],
+    step_idx: int,
+    visit_counts: np.ndarray,
+    agent_name: str = "",
+    episode: int = 0,
+    success: bool = False,
+    steps: int = 0,
+    reward: float = 0.0,
+    epsilon: float = 0.0,
+    model_size: int = 0,
+) -> Figure:
+    fig = plt.figure(figsize=(15, 4.5))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 1], wspace=0.3)
+
+    n = maze.size
+    U = 25.0
+
+    ax_grid = fig.add_subplot(gs[0, 0])
+    vmax = max(visit_counts.max(), 1)
+    for r in range(n):
+        for c in range(n):
+            if visit_counts[r][c] > 0:
+                cx, cy = _cell_center(r, c, n, U)
+                intensity = visit_counts[r][c] / vmax
+                color = plt.cm.get_cmap("YlOrRd")(intensity)
+                ax_grid.add_patch(plt.Rectangle(
+                    (cx - U * 0.4, cy - U * 0.4), U * 0.8, U * 0.8,
+                    facecolor=color, alpha=0.5, zorder=1,
+                ))
+
+    for gr, gc in maze.goals:
+        cx, cy = _cell_center(gr, gc, n, U)
+        ax_grid.add_patch(plt.Rectangle(
+            (cx - U * 0.35, cy - U * 0.35), U * 0.7, U * 0.7,
+            facecolor=GOAL_COLOR, alpha=0.6, edgecolor="none", zorder=2,
+        ))
+        ax_grid.text(cx, cy, "G", ha="center", va="center",
+                     fontsize=4, fontweight="bold", color="white", zorder=3)
+
+    if len(trajectory) > 1 and step_idx > 0:
+        path_slice = trajectory[:step_idx + 1]
+        px = [_cell_center(r, c, n, U)[0] for r, c in path_slice]
+        py = [_cell_center(r, c, n, U)[1] for r, c in path_slice]
+        ax_grid.plot(px, py, color=PATH_COLOR, linewidth=1.5, alpha=0.8, zorder=3)
+
+    if step_idx < len(trajectory):
+        cx, cy = _cell_center(*trajectory[step_idx], n, U)
+        ax_grid.add_patch(plt.Circle(
+            (cx, cy), U * 0.25, facecolor=AGENT_COLOR,
+            edgecolor="darkred", linewidth=1, zorder=5,
+        ))
+
+    _draw_maze_walls(ax_grid, maze, U)
+    _set_ax_limits(ax_grid, n, U)
+    ax_grid.set_title(f"Step {step_idx}/{len(trajectory)-1}", fontsize=9, fontweight="bold")
+
+    ax_q = fig.add_subplot(gs[0, 1])
+    max_q = np.zeros((n, n))
+    for r in range(n):
+        for c in range(n):
+            max_q[r][c] = np.max(q_table[r * n + c])
+    vmax_q = max(abs(max_q.max()), abs(max_q.min()), 1e-6)
+    for r in range(n):
+        for c in range(n):
+            cx, cy = _cell_center(r, c, n, U)
+            val = max_q[r][c]
+            norm_val = (val + vmax_q) / (2 * vmax_q)
+            color = plt.cm.coolwarm(norm_val)
+            ax_q.add_patch(plt.Rectangle(
+                (cx - U * 0.4, cy - U * 0.4), U * 0.8, U * 0.8,
+                facecolor=color, alpha=0.8, edgecolor="none", zorder=1,
+            ))
+    for gr, gc in maze.goals:
+        cx, cy = _cell_center(gr, gc, n, U)
+        ax_q.add_patch(plt.Rectangle(
+            (cx - U * 0.4, cy - U * 0.4), U * 0.8, U * 0.8,
+            facecolor=GOAL_COLOR, alpha=0.2, edgecolor="gold", linewidth=0.5, zorder=2,
+        ))
+    _draw_maze_walls(ax_q, maze, U)
+    _set_ax_limits(ax_q, n, U)
+    ax_q.set_title("Q-Table (max Q)", fontsize=9, fontweight="bold")
+
+    ax_pol = fig.add_subplot(gs[0, 2])
+    for r in range(n):
+        for c in range(n):
+            si = r * n + c
+            cx, cy = _cell_center(r, c, n, U)
+            best_a = int(np.argmax(q_table[si]))
+            best_q = q_table[si][best_a]
+            dr, dc = ACTION_DELTAS[best_a]
+            if abs(best_q) > 0.01:
+                color = "#27ae60" if best_q > 0 else "#c0392b"
+                alpha = min(abs(best_q) / 50.0, 1.0)
+                alpha = max(alpha, 0.3)
+                ax_pol.annotate(
+                    "",
+                    xy=(cx + dc * U * 0.3, cy + dr * U * 0.3),
+                    xytext=(cx - dc * U * 0.3, cy - dr * U * 0.3),
+                    arrowprops=dict(arrowstyle="->", color=color,
+                                    lw=max(0.5, U / 20), alpha=alpha),
+                    zorder=2,
+                )
+    _draw_maze_walls(ax_pol, maze, U)
+    _set_ax_limits(ax_pol, n, U)
+    ax_pol.set_title("Policy", fontsize=9, fontweight="bold")
+
+    status = "SUCCESS" if success else ""
+    info = f"{agent_name} | Episode {episode} | Step {step_idx}/{len(trajectory)-1}"
+    if status:
+        info += f" | {status}"
+    info += f" | Steps: {steps} | Reward: {reward:.0f} | \u03b5: {epsilon:.3f}"
+    if model_size > 0:
+        info += f" | Model: {model_size}"
+    fig.suptitle(info, fontsize=9, fontweight="bold",
+                 color="#27ae60" if success else "#333")
+
+    return fig

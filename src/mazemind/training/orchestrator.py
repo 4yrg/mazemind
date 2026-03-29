@@ -264,3 +264,69 @@ def train_with_snapshots(
             ))
 
     return metrics, snapshots, all_trajectories, exploration_history
+
+
+def train_both_generator(
+    dq_agent: DynaQAgent,
+    ss_agent: SarsaAgent,
+    dq_env: MicromouseEnv,
+    ss_env: MicromouseEnv,
+    n_episodes: int = 500,
+    max_steps: int = 1000,
+    alpha: float = 0.1,
+    gamma: float = 0.99,
+    seed: Optional[int] = None,
+) -> Generator[tuple[int, DynaQAgent, MicromouseEnv, SarsaAgent, MicromouseEnv, EpisodeMetrics, EpisodeMetrics, list, list], None, None]:
+    if seed is not None:
+        np.random.seed(seed)
+        _random.seed(seed)
+
+    for ep in range(n_episodes):
+        dq_state = dq_env.reset()
+        dq_si = dq_env.state_to_index(dq_state)
+        dq_total_reward = 0.0
+        dq_trajectory = [dq_state]
+
+        dq_action = dq_agent.select_action(dq_si)
+        for dq_step in range(max_steps):
+            dq_action = dq_agent.select_action(dq_si)
+            dq_result = dq_env.step(dq_action)
+            dq_nsi = dq_env.state_to_index(dq_result.state)
+            dq_total_reward += dq_result.reward
+            dq_trajectory.append(dq_result.state)
+            dq_agent.update(dq_si, dq_action, dq_result.reward, dq_nsi, alpha, gamma, dq_result.done)
+            dq_si = dq_nsi
+            if dq_result.done:
+                break
+        dq_agent.decay_epsilon()
+
+        ss_state = ss_env.reset()
+        ss_si = ss_env.state_to_index(ss_state)
+        ss_total_reward = 0.0
+        ss_trajectory = [ss_state]
+
+        ss_action = ss_agent.select_action(ss_si)
+        for ss_step in range(max_steps):
+            ss_result = ss_env.step(ss_action)
+            ss_nsi = ss_env.state_to_index(ss_result.state)
+            ss_total_reward += ss_result.reward
+            ss_trajectory.append(ss_result.state)
+            ss_next_action = ss_agent.select_action(ss_nsi)
+            ss_agent.update(ss_si, ss_action, ss_result.reward, ss_nsi, alpha, gamma, ss_result.done,
+                            next_action=ss_next_action)
+            ss_si = ss_nsi
+            ss_action = ss_next_action
+            if ss_result.done:
+                break
+        ss_agent.decay_epsilon()
+
+        dq_ep_metrics = EpisodeMetrics(
+            episode=ep, total_reward=dq_total_reward,
+            steps=dq_step + 1, success=dq_result.done, epsilon=dq_agent.epsilon,
+        )
+        ss_ep_metrics = EpisodeMetrics(
+            episode=ep, total_reward=ss_total_reward,
+            steps=ss_step + 1, success=ss_result.done, epsilon=ss_agent.epsilon,
+        )
+
+        yield ep, dq_agent, dq_env, ss_agent, ss_env, dq_ep_metrics, ss_ep_metrics, dq_trajectory, ss_trajectory
